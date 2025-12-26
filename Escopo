@@ -1,0 +1,163 @@
+📦 ERP de Gerenciamento de Armazenamento (Galpão)
+🎯 Visão geral do sistema
+
+Um ERP web para controle de armazenamento em galpões, focado em:
+
+Visibilidade total do estoque
+
+Acompanhamento de produtos em trânsito
+
+Controle de chegada, posição e status dos produtos
+
+Separação clara de acessos (gestor, analista, cliente)
+
+Métrica de armazenamento flexível, definida pelo gestor (m², posições, pallets, caixas, slots, etc.)
+
+Stack definida (ótima escolha):
+
+Frontend: React
+
+Backend + Auth + DB: Supabase
+
+👥 Perfis de autenticação (muito bem pensados)
+1️⃣ Gestor (Acesso total)
+
+Permissões:
+
+Criar / editar / remover usuários
+
+Definir métrica de armazenamento do galpão
+
+Criar setores, áreas, posições ou zonas
+
+Visualizar todos os produtos (em trânsito, no estoque, entregues)
+
+Dashboard geral (ocupação, entradas, saídas, alertas)
+
+Relatórios (ocupação, histórico, clientes, movimentações)
+
+👉 Esse perfil é quem “manda” no galpão.
+
+2️⃣ Analista de Armazém
+
+Permissões:
+
+Visualizar espaços disponíveis e ocupados
+
+Visualizar produtos:
+
+A caminho
+
+Recebidos
+
+Em estoque
+
+Registrar chegada de produto
+
+Atualizar status e localização do produto
+
+(Opcional) registrar saída / despacho
+
+👉 Perfil operacional, sem poder estrutural.
+
+3️⃣ Cliente
+
+Permissões:
+
+Visualizar apenas seus próprios produtos
+
+Acompanhar status:
+
+Pedido criado
+
+Em transporte
+
+Recebido no galpão
+
+Armazenado
+
+Em separação / saída
+
+Ver onde está o produto (zona, setor ou posição)
+
+Datas estimadas (se configurado)
+
+👉 Transparência total sem contato manual.
+
+🧠 Estrutura lógica do sistema (alto nível)
+📦 Produto
+
+Código / SKU
+
+Descrição
+
+Cliente vinculado
+
+Status (em trânsito, recebido, armazenado, entregue)
+
+Data prevista de chegada
+
+Data real de chegada
+
+Métrica ocupada (valor numérico)
+
+Localização no galpão
+
+🏭 Galpão / Armazenamento
+
+Métrica definida pelo gestor:
+
+Ex: m², pallets, caixas, posições
+
+Capacidade total
+
+Capacidade usada
+
+Capacidade disponível
+
+Setores / áreas / zonas (opcional no MVP)
+
+📊 Dashboards (MVP)
+Gestor
+
+Ocupação total (%)
+
+Produtos por status
+
+Entradas previstas vs recebidas
+
+Capacidade restante
+
+Alertas (lotação, atrasos)
+
+Analista
+
+Lista de produtos chegando hoje / semana
+
+Produtos aguardando registro
+
+Ocupação por setor
+
+Cliente
+
+Linha do tempo do pedido
+
+Status atual
+
+Localização simplificada
+
+🧱 Estrutura técnica (Supabase)
+
+Auth: Supabase Auth (roles via tabela profiles)
+
+DB: PostgreSQL
+
+Policies (RLS):
+
+Gestor → acesso total
+
+Analista → leitura geral + escrita operacional
+
+Cliente → somente seus dados
+
+Realtime: atualização de status (opcional)
