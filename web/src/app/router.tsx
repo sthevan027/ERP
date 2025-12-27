@@ -16,6 +16,7 @@ export const router = createBrowserRouter([
   {
     element: <EnvGate />,
     children: [
+      { path: '/', element: <Navigate to="/login" replace /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/pendente', element: <PendingLinkPage /> },
       {

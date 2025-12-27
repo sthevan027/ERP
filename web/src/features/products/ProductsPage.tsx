@@ -4,21 +4,25 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { createProduct, listClients, listProducts, listWarehouses } from '../../lib/db'
 import { errorMessage } from '../../lib/errors'
-import { statusBadgeClass, statusLabel } from '../../lib/format'
+import { statusLabel } from '../../lib/format'
 import type { Client, Product, Warehouse } from '../../lib/types'
 import { useAuth } from '../../app/hooks/useAuth'
+import { PackageIcon, PlusIcon, AlertCircleIcon, SearchIcon } from '../../components/icons'
 
 export function ProductsPage() {
   const { role, orgId } = useAuth()
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [clients, setClients] = useState<Client[]>([])
 
   const canCreate = role === 'manager' || role === 'analyst'
 
+  const [showForm, setShowForm] = useState(false)
   const [newSku, setNewSku] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newQty, setNewQty] = useState('1')
@@ -53,6 +57,17 @@ export function ProductsPage() {
     return wh.metric_label ?? wh.metric_unit
   }, [warehouses, newWarehouseId])
 
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchSearch =
+        !search ||
+        p.sku.toLowerCase().includes(search.toLowerCase()) ||
+        p.description?.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = statusFilter === 'all' || p.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [products, search, statusFilter])
+
   async function onCreate() {
     if (!orgId) {
       setError('Usuário não vinculado a uma organização.')
@@ -74,6 +89,7 @@ export function ProductsPage() {
       setNewDesc('')
       setNewQty('1')
       setNewExpected('')
+      setShowForm(false)
       await reload()
     } catch (e: unknown) {
       setError(errorMessage(e, 'Falha ao criar produto'))
@@ -83,32 +99,48 @@ export function ProductsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="card">
-        <h2 style={{ margin: 0 }}>Produtos</h2>
-        <div className="muted" style={{ marginTop: 6 }}>
-          {canCreate ? 'Cadastro e consulta.' : 'Consulta restrita aos seus produtos.'}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
+        <div className="page-header" style={{ marginBottom: 0 }}>
+          <h1 className="page-title">Produtos</h1>
+          <p className="page-subtitle">
+            {canCreate ? 'Gerencie o cadastro de produtos' : 'Consulte seus produtos'}
+          </p>
         </div>
+        {canCreate && (
+          <Button onClick={() => setShowForm(!showForm)} icon={<PlusIcon size={18} />}>
+            Novo Produto
+          </Button>
+        )}
       </div>
 
+      {/* Error Alert */}
       {error && (
-        <div className="card" style={{ borderColor: 'rgba(239,68,68,0.45)' }}>
-          <strong>Erro</strong>
-          <div className="muted" style={{ marginTop: 6 }}>
-            {error}
+        <div className="alert alert-error">
+          <AlertCircleIcon size={20} />
+          <div>
+            <strong>Erro</strong>
+            <p style={{ margin: 0, marginTop: 4, opacity: 0.9 }}>{error}</p>
           </div>
         </div>
       )}
 
-      {canCreate && (
+      {/* Create Form */}
+      {showForm && canCreate && (
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Novo produto</h3>
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Novo Produto</h3>
+              <p className="card-subtitle">Preencha os dados do produto</p>
+            </div>
+          </div>
 
-          <div className="row">
-            <div style={{ flex: '1 1 220px' }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+          <div className="grid grid-2" style={{ gap: 'var(--space-md)' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
                 Cliente
-              </div>
+              </label>
               <Select value={newClientId} onChange={(e) => setNewClientId(e.target.value)}>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -118,10 +150,10 @@ export function ProductsPage() {
               </Select>
             </div>
 
-            <div style={{ flex: '1 1 220px' }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
                 Galpão
-              </div>
+              </label>
               <Select value={newWarehouseId} onChange={(e) => setNewWarehouseId(e.target.value)}>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -130,74 +162,146 @@ export function ProductsPage() {
                 ))}
               </Select>
             </div>
-          </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <div style={{ flex: '1 1 160px' }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
                 SKU
-              </div>
-              <Input value={newSku} onChange={(e) => setNewSku(e.target.value)} placeholder="SKU-123" />
+              </label>
+              <Input value={newSku} onChange={(e) => setNewSku(e.target.value)} placeholder="SKU-001" />
             </div>
-            <div style={{ flex: '2 1 280px' }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                Descrição
-              </div>
-              <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Descrição (opcional)" />
-            </div>
-          </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <div style={{ flex: '1 1 160px' }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                Quantidade ({metricLabel})
-              </div>
-              <Input value={newQty} onChange={(e) => setNewQty(e.target.value)} inputMode="decimal" />
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                Descrição
+              </label>
+              <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Descrição do produto (opcional)" />
             </div>
-            <div style={{ flex: '1 1 200px' }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                Previsão de chegada
-              </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                Quantidade ({metricLabel})
+              </label>
+              <Input value={newQty} onChange={(e) => setNewQty(e.target.value)} type="number" inputMode="decimal" />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                Previsão de Chegada
+              </label>
               <Input value={newExpected} onChange={(e) => setNewExpected(e.target.value)} type="date" />
             </div>
-            <div style={{ flex: '1 1 180px', display: 'flex', alignItems: 'flex-end' }}>
-              <Button disabled={creating || !newSku.trim() || !newClientId || !newWarehouseId} onClick={onCreate}>
-                {creating ? 'Salvando...' : 'Cadastrar'}
-              </Button>
-            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-lg)', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={onCreate}
+              loading={creating}
+              disabled={!newSku.trim() || !newClientId || !newWarehouseId}
+            >
+              Cadastrar Produto
+            </Button>
           </div>
         </div>
       )}
 
+      {/* Products List */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Lista</h3>
+        <div className="card-header">
+          <div>
+            <h3 className="card-title">Lista de Produtos</h3>
+            <p className="card-subtitle">{filteredProducts.length} produto(s) encontrado(s)</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 280px' }}>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por SKU ou descrição..."
+              icon={<SearchIcon size={18} />}
+            />
+          </div>
+          <div style={{ width: 180 }}>
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">Todos os Status</option>
+              <option value="in_transit">A Caminho</option>
+              <option value="received">Recebido</option>
+              <option value="in_stock">Em Estoque</option>
+            </Select>
+          </div>
+        </div>
+
+        {/* Table */}
         {busy ? (
-          <div className="muted">Carregando...</div>
-        ) : products.length === 0 ? (
-          <div className="muted">Nenhum produto encontrado.</div>
+          <div className="loading-overlay">
+            <div className="loading-spinner" />
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="empty-state">
+            <PackageIcon size={48} style={{ opacity: 0.3, marginBottom: 'var(--space-md)' }} />
+            <div className="empty-state-title">Nenhum produto encontrado</div>
+            <div className="empty-state-text">
+              {search || statusFilter !== 'all'
+                ? 'Tente ajustar os filtros de busca.'
+                : 'Comece cadastrando um novo produto.'}
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {products.slice(0, 50).map((p) => (
-              <div key={p.id} className="card" style={{ padding: 12 }}>
-                <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <strong>{p.sku}</strong>
-                    {p.description && <span className="muted">{p.description}</span>}
-                  </div>
-                  <span className={`badge ${statusBadgeClass(p.status)}`}>{statusLabel(p.status)}</span>
-                </div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                  Quantidade: <strong>{Number(p.metric_qty).toFixed(2)}</strong> · Criado em:{' '}
-                  {new Date(p.created_at).toLocaleString()}
-                </div>
-              </div>
-            ))}
-            {products.length > 50 && <div className="muted">Mostrando 50 de {products.length} (MVP).</div>}
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Descrição</th>
+                  <th>Quantidade</th>
+                  <th>Previsão</th>
+                  <th>Status</th>
+                  <th>Criado em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.slice(0, 50).map((p) => (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: 600 }}>{p.sku}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{p.description ?? '—'}</td>
+                    <td>{Number(p.metric_qty).toFixed(2)}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>
+                      {p.expected_arrival_date ?? '—'}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          p.status === 'in_stock'
+                            ? 'badge-success'
+                            : p.status === 'received'
+                              ? 'badge-primary'
+                              : 'badge-warning'
+                        }`}
+                      >
+                        {statusLabel(p.status)}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                      {new Date(p.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {filteredProducts.length > 50 && (
+          <div style={{ marginTop: 'var(--space-md)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            Mostrando 50 de {filteredProducts.length} produtos
           </div>
         )}
       </div>
     </div>
   )
 }
-
-

@@ -1,63 +1,151 @@
-import { NavLink, Outlet, type NavLinkProps } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../app/hooks/useAuth'
 import { Button } from './ui/Button'
+import {
+  DashboardIcon,
+  PackageIcon,
+  TruckIcon,
+  SettingsIcon,
+  LogoutIcon,
+  BuildingIcon,
+} from './icons'
 
-const linkStyle: NavLinkProps['style'] = ({ isActive }) => ({
-  padding: '10px 12px',
-  borderRadius: 12,
-  border: '1px solid var(--border)',
-  background: isActive ? 'rgba(59,130,246,0.20)' : 'rgba(255,255,255,0.04)',
-})
+const roleLabels: Record<string, string> = {
+  manager: 'Gestor',
+  analyst: 'Analista',
+  client: 'Cliente',
+}
 
 export function AppShell() {
   const { role, profile, signOut } = useAuth()
 
+  const navItems = [
+    { to: '/dashboard', label: 'Dashboard', icon: <DashboardIcon size={18} />, roles: ['manager', 'analyst', 'client'] },
+    { to: '/produtos', label: 'Produtos', icon: <PackageIcon size={18} />, roles: ['manager', 'analyst', 'client'] },
+    { to: '/recebimentos', label: 'Recebimentos', icon: <TruckIcon size={18} />, roles: ['manager', 'analyst'] },
+    { to: '/config/galpao', label: 'Config. Galpão', icon: <SettingsIcon size={18} />, roles: ['manager'] },
+  ]
+
+  const visibleItems = navItems.filter((item) => role && item.roles.includes(role))
+
   return (
-    <div>
-      <header style={{ borderBottom: '1px solid var(--border)', background: 'rgba(0,0,0,0.18)' }}>
-        <div
-          className="container"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <strong>ERP Galpão</strong>
-            <span className="muted" style={{ fontSize: 12 }}>
-              {profile?.full_name ?? 'Usuário'} · <span className="badge primary">{role ?? '—'}</span>
-            </span>
+    <div className="app-layout">
+      {/* Sidebar */}
+      <aside className="app-sidebar">
+        {/* Logo */}
+        <div style={{
+          padding: '24px 20px',
+          borderBottom: '1px solid var(--border-subtle)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: 40,
+              height: 40,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <BuildingIcon size={22} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                ERP Galpão
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Sistema de Armazenagem
+              </div>
+            </div>
           </div>
-
-          <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <NavLink to="/dashboard" style={linkStyle}>
-              Dashboard
-            </NavLink>
-            <NavLink to="/produtos" style={linkStyle}>
-              Produtos
-            </NavLink>
-
-            {role === 'analyst' && (
-              <NavLink to="/recebimentos" style={linkStyle}>
-                Recebimentos
-              </NavLink>
-            )}
-
-            {role === 'manager' && (
-              <NavLink to="/config/galpao" style={linkStyle}>
-                Config. Galpão
-              </NavLink>
-            )}
-
-            <Button variant="ghost" onClick={() => signOut()}>
-              Sair
-            </Button>
-          </nav>
         </div>
-      </header>
 
-      <main className="container">
-        <Outlet />
+        {/* Navigation */}
+        <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {visibleItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                color: isActive ? 'var(--primary-light)' : 'var(--text-secondary)',
+                background: isActive ? 'var(--primary-bg)' : 'transparent',
+                transition: 'all 150ms ease',
+                textDecoration: 'none',
+                fontWeight: isActive ? 500 : 400,
+                fontSize: '0.875rem',
+              })}
+            >
+              {item.icon}
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* User section */}
+        <div style={{
+          padding: '16px',
+          borderTop: '1px solid var(--border-subtle)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: '8px',
+              background: 'var(--bg-elevated)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+            }}>
+              {(profile?.full_name?.[0] ?? profile?.user_id?.[0] ?? 'U').toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontWeight: 500,
+                fontSize: '0.875rem',
+                color: 'var(--text-primary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {profile?.full_name ?? 'Usuário'}
+              </div>
+              <div style={{
+                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+              }}>
+                {roleLabels[role ?? ''] ?? role ?? '—'}
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => signOut()}
+            icon={<LogoutIcon size={16} />}
+            style={{ justifyContent: 'flex-start', color: 'var(--text-secondary)' }}
+          >
+            Sair
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="app-main">
+        <div className="app-content">
+          <Outlet />
+        </div>
       </main>
     </div>
   )
 }
-
-

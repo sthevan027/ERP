@@ -9,7 +9,50 @@ ERP web para gerenciamento de armazenamento em galpões (logística), com **3 pe
 ## Stack
 
 - **Frontend**: React + Vite + TypeScript
-- **Backend/Auth/DB**: Supabase (PostgreSQL + Auth + RLS)
+- **Backend/Auth/DB**: Supabase (PostgreSQL + Auth + RLS) **ou Modo Demo (localStorage)**
+
+---
+
+## 🎯 Modo Demonstração (Recomendado para Apresentações)
+
+O sistema possui um **modo demonstração** que funciona **100% no frontend**, usando `localStorage` para armazenar dados. **Perfeito para apresentações sem precisar configurar banco de dados.**
+
+### Como usar o Modo Demo
+
+1. **Inicie o servidor:**
+   ```bash
+   cd web
+   pnpm install
+   pnpm dev
+   ```
+
+2. **Acesse:** `http://localhost:5173`
+
+3. **Faça login com uma das contas de demonstração:**
+   - **Gestor:** `gestor@demo.com` / `Gestor123!`
+   - **Analista:** `analista@demo.com` / `Analista123!`
+   - **Cliente:** `cliente@demo.com` / `Cliente123!`
+
+### Dados Pré-carregados
+
+O sistema já vem com:
+- ✅ 1 Organização (Empresa Demo)
+- ✅ 1 Galpão (Galpão Principal - 1000 pallets)
+- ✅ 1 Cliente (Cliente Demo)
+- ✅ 3 Produtos de exemplo (em diferentes status)
+- ✅ 3 Usuários (Gestor, Analista, Cliente)
+
+### Desativar Modo Demo
+
+Para usar o Supabase real, edite `web/src/lib/demoSupabaseClient.ts`:
+
+```typescript
+export const USE_DEMO_MODE = false // Mude para false
+```
+
+E configure o `.env.local` com suas credenciais do Supabase (veja seção abaixo).
+
+**Nota:** O modo demo é ativado automaticamente se o Supabase não estiver configurado.
 
 ---
 
@@ -119,7 +162,21 @@ Resumo:
 
 ## Como rodar
 
-### Banco (Supabase)
+### Opção 1: Modo Demonstração (Recomendado para testes/apresentações)
+
+**Não precisa configurar nada!** O sistema funciona automaticamente com dados locais.
+
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+
+Acesse `http://localhost:5173` e use as credenciais de demonstração (veja seção acima).
+
+### Opção 2: Com Supabase Real (Produção)
+
+#### Banco (Supabase)
 
 1. Crie um projeto no Supabase
 2. Rode `supabase/schema.sql` no SQL Editor
@@ -172,17 +229,49 @@ Rode em **2 passos** no SQL Editor:
 1) Rode **apenas**: `supabase/migrations/001_user_role_unassigned.sql`  
 2) Depois rode: `supabase/schema.sql`
 
-### Frontend (React)
+#### Frontend (React)
 
-1. Copie `web/env.example` para `web/.env.local` e preencha:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-2. Instale deps e rode:
+1. **Desative o modo demo** (se necessário):
+   - Edite `web/src/lib/demoSupabaseClient.ts` e mude `USE_DEMO_MODE = false`
+
+2. **Configure as variáveis de ambiente:**
+   - Copie `web/env.example` para `web/.env.local`
+   - Preencha:
+     - `VITE_SUPABASE_URL`
+     - `VITE_SUPABASE_ANON_KEY`
+
+3. **Instale deps e rode:**
 
 ```bash
 cd web
 pnpm install
 pnpm dev
 ```
+
+---
+
+## 🚀 Melhorias Implementadas
+
+### ✅ Sistema de Demonstração
+- Modo demo com localStorage (sem necessidade de banco)
+- Dados pré-carregados para apresentações
+- Funcionalidade completa sem configuração
+
+### ✅ Melhorias de Conexão
+- Wrapper de queries com retry automático (`dbClient.ts`)
+- Timeout de 12s em todas as chamadas
+- Mensagens de erro traduzidas e amigáveis
+- Tratamento robusto de erros de rede/RLS/timeout
+
+### ✅ Segurança
+- Políticas RLS revisadas e corrigidas
+- Usuário não pode alterar `role/org_id/client_id` via client-side
+- RPC `app.admin_assign_user_role()` para gestores vincularem usuários
+
+### ✅ UX/UI
+- Loading infinito resolvido
+- Mensagens de erro claras
+- Interface de login melhorada com ícone de olho
+- Feedback visual na página de acesso pendente
 
 

@@ -1,23 +1,36 @@
 import { type Session } from '@supabase/supabase-js'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
+import { supabase, supabaseConfigured, USE_DEMO } from '../../lib/supabaseClient'
 import type { Profile } from '../../lib/types'
 import { AuthContext, type AuthState } from './authContext'
 import { errorMessage } from '../../lib/errors'
+import { queryWithRetry, translateDbError } from '../../lib/dbClient'
+import { demoProfiles } from '../../lib/demoStorage'
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('user_id, org_id, role, client_id, full_name')
-    .eq('user_id', userId)
-    .single()
-  if (error) {
-    // Se o usuário ainda não tem perfil vinculado (ex: primeiro login), o RLS permite select self.
-    // Ainda assim, `.single()` pode falhar caso não exista linha.
-    if (error.code === 'PGRST116') return null
-    throw error
+  // Em modo demo, usa o storage local
+  if (USE_DEMO) {
+    return await demoProfiles.get(userId)
   }
-  return data as Profile
+
+  try {
+    const data = await queryWithRetry<Profile>(() =>
+      supabase
+        .from('profiles')
+        .select('user_id, org_id, role, client_id, full_name')
+        .eq('user_id', userId)
+        .single(),
+    )
+    return data
+  } catch (error: unknown) {
+    // Se não encontrou o perfil, retorna null (usuário ainda não vinculado)
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'PGRST116') {
+      return null
+    }
+    // Loga o erro mas não quebra o app - o usuário pode estar em processo de vinculação
+    console.error('Erro ao buscar perfil:', translateDbError(error))
+    return null
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -27,13 +40,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
 
   const refreshProfile = useCallback(async () => {
-    const s = (await supabase.auth.getSession()).data.session
-    if (!s) {
+    if (!supabaseConfigured) {
       setProfile(null)
       return
     }
-    const p = await fetchProfile(s.user.id)
-    setProfile(p)
+    try {
+      const s = (await supabase.auth.getSession()).data.session
+      if (!s) {
+        setProfile(null)
+        return
+      }
+      const p = await fetchProfile(s.user.id)
+      setProfile(p)
+    } catch (err) {
+      console.error('Erro ao atualizar profile:', err)
+      // Se der erro, tenta buscar novamente - pode ser que o profile ainda não exista
+      setProfile(null)
+    }
   }, [])
 
   useEffect(() => {
@@ -78,13 +101,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     init()
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    if (!supabaseConfigured) {
+      return () => {
+        alive = false
+      }
+    }
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event: string, newSession: Session | null) => {
+      if (!alive) return
       setSession(newSession)
       if (newSession) {
         try {
           const p = await fetchProfile(newSession.user.id)
+          if (!alive) return
           setProfile(p)
-        } catch {
+        } catch (err) {
+          if (!alive) return
+          console.error('Erro ao buscar perfil após login:', err)
           setProfile(null)
         }
       } else {
@@ -99,11 +132,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInWithPassword = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    // Em modo demo, não precisa verificar supabaseConfigured
+    if (!USE_DEMO && !supabaseConfigured) {
+      throw new Error('Supabase não configurado (verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY)')
+    }
+    
+    // Em modo demo, não precisa de timeout
+    if (USE_DEMO) {
+      // Garante que email é string antes de fazer trim
+      const emailStr = typeof email === 'string' ? email.trim() : String(email).trim()
+      const { error } = await supabase.auth.signInWithPassword({ email: emailStr, password })
+      if (error) {
+        throw new Error(error.message || 'Falha ao fazer login')
+      }
+      return
+    }
+    
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
+    
+    try {
+      // Garante que email é string antes de fazer trim
+      const emailStr = typeof email === 'string' ? email.trim() : String(email).trim()
+      const { error } = await supabase.auth.signInWithPassword({ email: emailStr, password })
+      clearTimeout(timeoutId)
+      if (error) {
+        throw new Error(error.message || 'Falha ao fazer login')
+      }
+    } catch (err: unknown) {
+      clearTimeout(timeoutId)
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('Timeout ao conectar com Supabase. Verifique sua conexão e as variáveis de ambiente.')
+      }
+      throw err
+    }
   }, [])
 
   const signOut = useCallback(async () => {
+    if (!supabaseConfigured) return
     const { error } = await supabase.auth.signOut()
     if (error) throw error
   }, [])

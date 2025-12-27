@@ -40,7 +40,10 @@ export function Protected() {
       </div>
     )
   if (!session) return <Navigate to="/login" replace />
-  if (!profile || !profile.org_id || role === 'unassigned') return <Navigate to="/pendente" replace />
+  
+  // Verifica se o usuário está vinculado (tem org_id e role válido)
+  if (!profile) return <Navigate to="/pendente" replace />
+  if (!profile.org_id || role === 'unassigned') return <Navigate to="/pendente" replace />
 
   return <Outlet />
 }

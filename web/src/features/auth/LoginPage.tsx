@@ -3,21 +3,9 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../app/hooks/useAuth'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
-import { env } from '../../lib/env'
 import { errorMessage } from '../../lib/errors'
-
-function timeout(ms: number) {
-  return new Promise<never>((_resolve, reject) => {
-    const id = setTimeout(() => {
-      clearTimeout(id)
-      reject(
-        new Error(
-          'Timeout ao tentar logar. Verifique VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY e se sua rede está liberando acesso ao Supabase.',
-        ),
-      )
-    }, ms)
-  })
-}
+import { USE_DEMO } from '../../lib/supabaseClient'
+import { EyeIcon, EyeOffIcon, BuildingIcon, AlertCircleIcon } from '../../components/icons'
 
 export function LoginPage() {
   const { session, loading, signInWithPassword } = useAuth()
@@ -26,9 +14,6 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [diagOpen, setDiagOpen] = useState(false)
-  const [diagBusy, setDiagBusy] = useState(false)
-  const [diagResult, setDiagResult] = useState<string | null>(null)
 
   if (!loading && session) return <Navigate to="/dashboard" replace />
 
@@ -36,158 +21,198 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     setBusy(true)
+
     try {
-      // Evita “travado em Entrando…” quando o request fica pendurado (rede/config).
-      await Promise.race([signInWithPassword(email.trim(), password), timeout(12000)])
+      const emailStr = String(email || '').trim()
+      const passwordStr = String(password || '')
+
+      if (!emailStr || !passwordStr) {
+        setError('Preencha e-mail e senha.')
+        return
+      }
+
+      await signInWithPassword(emailStr, passwordStr)
     } catch (err: unknown) {
-      setError(errorMessage(err, 'Falha ao entrar'))
+      const msg = errorMessage(err, 'Falha ao entrar')
+      setError(msg)
+      console.error('Erro no login:', err)
     } finally {
       setBusy(false)
     }
   }
 
-  async function testConnection() {
-    setDiagBusy(true)
-    setDiagResult(null)
-    try {
-      if (!env.supabaseUrl || !env.supabaseAnonKey) {
-        setDiagResult(`Faltando env: ${env.missing.join(', ')}`)
-        return
-      }
-
-      const url = `${env.supabaseUrl.replace(/\/$/, '')}/auth/v1/health`
-      const res = await Promise.race([
-        fetch(url, {
-          method: 'GET',
-          headers: {
-            apikey: env.supabaseAnonKey,
-            Authorization: `Bearer ${env.supabaseAnonKey}`,
-          },
-        }),
-        timeout(12000),
-      ])
-
-      if (!('ok' in res)) {
-        // nunca deve acontecer, mas ajuda o TS
-        throw new Error('Resposta inválida do teste de conexão')
-      }
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        setDiagResult(`HTTP ${res.status} ao acessar ${url}\n${text || '(sem body)'}`)
-        return
-      }
-
-      const text = await res.text().catch(() => '')
-      setDiagResult(`OK (${res.status}) em ${url}\n${text || '(sem body)'}`)
-    } catch (e: unknown) {
-      setDiagResult(errorMessage(e, 'Falha no teste de conexão'))
-    } finally {
-      setDiagBusy(false)
-    }
-  }
-
   return (
-    <div className="container" style={{ maxWidth: 560 }}>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Entrar</h2>
-        <p className="muted" style={{ marginTop: -6 }}>
-          Use o e-mail e senha cadastrados no Supabase Auth.
-        </p>
-
-        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label className="muted" style={{ fontSize: 12 }}>
-              E-mail
-            </label>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--space-lg)',
+        background: 'linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-main) 50%, var(--bg-dark) 100%)',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-xl)' }}>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 'var(--space-md)',
+              boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3)',
+            }}
+          >
+            <BuildingIcon size={32} style={{ color: '#fff' }} />
           </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-xs)' }}>
+            ERP Galpão
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            Sistema de Gerenciamento de Armazenagem
+          </p>
+        </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label className="muted" style={{ fontSize: 12 }}>
-              Senha
-            </label>
-            <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-              <div style={{ flex: 1 }}>
-                <Input
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                />
+        {/* Demo Banner */}
+        {USE_DEMO && (
+          <div
+            style={{
+              background: 'var(--info-bg)',
+              border: '1px solid var(--info-border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-md)',
+              marginBottom: 'var(--space-md)',
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--info)', marginBottom: 'var(--space-xs)' }}>
+              Modo Demonstração
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              Sistema funcionando com dados locais. Credenciais:
+              <div style={{ marginTop: 'var(--space-sm)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <code style={{ fontSize: '0.7rem' }}>gestor@demo.com / Gestor123!</code>
+                <code style={{ fontSize: '0.7rem' }}>analista@demo.com / Analista123!</code>
+                <code style={{ fontSize: '0.7rem' }}>cliente@demo.com / Cliente123!</code>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                style={{ whiteSpace: 'nowrap' }}
+            </div>
+          </div>
+        )}
+
+        {/* Login Card */}
+        <div
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-xl)',
+            padding: 'var(--space-xl)',
+            boxShadow: 'var(--shadow-lg)',
+          }}
+        >
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--space-lg)' }}>
+            Entrar
+          </h2>
+
+          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: 'var(--text-secondary)',
+                  marginBottom: 'var(--space-xs)',
+                }}
               >
-                {showPassword ? 'Ocultar' : 'Mostrar'}
-              </Button>
+                E-mail
+              </label>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                placeholder="seu@email.com"
+                required
+              />
             </div>
-          </div>
 
-          {error && (
-            <div className="card" style={{ borderColor: 'rgba(239,68,68,0.45)' }}>
-              <strong>Erro</strong>
-              <div className="muted" style={{ marginTop: 6 }}>
-                {error}
-              </div>
-            </div>
-          )}
-
-          <div className="card" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-            <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <strong>Diagnóstico</strong>
-              <Button type="button" variant="ghost" onClick={() => setDiagOpen((v) => !v)}>
-                {diagOpen ? 'Fechar' : 'Abrir'}
-              </Button>
-            </div>
-            {diagOpen && (
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  Supabase URL:{' '}
-                  <code>{env.supabaseUrl ? env.supabaseUrl : '(não configurado)'}</code>
-                  <br />
-                  ANON key:{' '}
-                  <code>{env.supabaseAnonKey ? `(${env.supabaseAnonKey.length} chars)` : '(não configurado)'}</code>
-                </div>
-
-                <div className="row">
-                  <Button type="button" disabled={diagBusy} onClick={testConnection}>
-                    {diagBusy ? 'Testando...' : 'Testar conexão com Supabase'}
-                  </Button>
-                </div>
-
-                {diagResult && (
-                  <pre
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: 'var(--text-secondary)',
+                  marginBottom: 'var(--space-xs)',
+                }}
+              >
+                Senha
+              </label>
+              <Input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                required
+                suffix={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                     style={{
-                      margin: 0,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      fontSize: 12,
-                      color: 'var(--muted)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 12,
-                      padding: 10,
-                      background: 'rgba(0,0,0,0.18)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '8px',
+                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '6px',
+                      transition: 'color 150ms ease',
                     }}
                   >
-                    {diagResult}
-                  </pre>
-                )}
+                    {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+                  </button>
+                }
+              />
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 'var(--space-sm)',
+                  padding: 'var(--space-md)',
+                  background: 'var(--danger-bg)',
+                  border: '1px solid var(--danger-border)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--danger)',
+                  fontSize: '0.875rem',
+                }}
+              >
+                <AlertCircleIcon size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>{error}</span>
               </div>
             )}
-          </div>
 
-          <Button disabled={busy} type="submit">
-            {busy ? 'Entrando...' : 'Entrar'}
-          </Button>
-        </form>
+            <Button type="submit" loading={busy} fullWidth style={{ marginTop: 'var(--space-sm)' }}>
+              {busy ? 'Entrando...' : 'Entrar'}
+            </Button>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)' }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            © 2025 ERP Galpão · Sistema de Armazenagem
+          </p>
+        </div>
       </div>
     </div>
   )
 }
-
-

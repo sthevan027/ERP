@@ -5,14 +5,24 @@ import { Select } from '../../components/ui/Select'
 import { listWarehouses, updateWarehouseSettings } from '../../lib/db'
 import { errorMessage } from '../../lib/errors'
 import type { Warehouse } from '../../lib/types'
+import { SettingsIcon, AlertCircleIcon, CheckCircleIcon, WarehouseIcon } from '../../components/icons'
 
 const metricUnits = ['m2', 'pallet', 'box', 'position', 'custom'] as const
 type MetricUnit = (typeof metricUnits)[number]
+
+const metricLabelsMap: Record<MetricUnit, string> = {
+  m2: 'Metros Quadrados (m²)',
+  pallet: 'Pallets',
+  box: 'Caixas',
+  position: 'Posições',
+  custom: 'Personalizado',
+}
 
 export function WarehouseSettingsPage() {
   const [busy, setBusy] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
 
   const [warehouseId, setWarehouseId] = useState('')
@@ -57,6 +67,7 @@ export function WarehouseSettingsPage() {
     if (!selected) return
     setSaving(true)
     setError(null)
+    setSuccess(null)
     try {
       await updateWarehouseSettings({
         warehouseId: selected.id,
@@ -66,6 +77,8 @@ export function WarehouseSettingsPage() {
       })
       const w = await listWarehouses()
       setWarehouses(w)
+      setSuccess('Configurações salvas com sucesso!')
+      setTimeout(() => setSuccess(null), 3000)
     } catch (e: unknown) {
       setError(errorMessage(e, 'Falha ao salvar'))
     } finally {
@@ -74,38 +87,78 @@ export function WarehouseSettingsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="card">
-        <h2 style={{ margin: 0 }}>Configuração do Galpão</h2>
-        <div className="muted" style={{ marginTop: 6 }}>
-          O Gestor define a métrica (m²/pallet/caixas/posições/custom) e a capacidade total.
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+      {/* Page Header */}
+      <div className="page-header">
+        <h1 className="page-title">Configuração do Galpão</h1>
+        <p className="page-subtitle">
+          Configure as métricas e capacidade do galpão
+        </p>
       </div>
 
+      {/* Error Alert */}
       {error && (
-        <div className="card" style={{ borderColor: 'rgba(239,68,68,0.45)' }}>
-          <strong>Erro</strong>
-          <div className="muted" style={{ marginTop: 6 }}>
-            {error}
+        <div className="alert alert-error">
+          <AlertCircleIcon size={20} />
+          <div>
+            <strong>Erro</strong>
+            <p style={{ margin: 0, marginTop: 4, opacity: 0.9 }}>{error}</p>
           </div>
         </div>
       )}
 
+      {/* Success Alert */}
+      {success && (
+        <div className="alert alert-success">
+          <CheckCircleIcon size={20} />
+          <span>{success}</span>
+        </div>
+      )}
+
+      {/* Settings Card */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Galpão</h3>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--primary-bg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--primary)',
+              }}
+            >
+              <SettingsIcon size={20} />
+            </div>
+            <div>
+              <h3 className="card-title">Configurações</h3>
+              <p className="card-subtitle">Defina a métrica e capacidade</p>
+            </div>
+          </div>
+        </div>
+
         {busy ? (
-          <div className="muted">Carregando...</div>
+          <div className="loading-overlay" style={{ minHeight: 200 }}>
+            <div className="loading-spinner" />
+          </div>
         ) : warehouses.length === 0 ? (
-          <div className="muted">
-            Nenhum galpão encontrado. Crie uma linha em <code>warehouses</code> via SQL Editor (MVP) usando o Service Role
-            ou manualmente.
+          <div className="empty-state" style={{ padding: 'var(--space-2xl)' }}>
+            <WarehouseIcon size={48} style={{ opacity: 0.3, marginBottom: 'var(--space-md)' }} />
+            <div className="empty-state-title">Nenhum galpão encontrado</div>
+            <div className="empty-state-text">
+              É necessário criar um galpão no banco de dados para configurar.
+            </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+            {/* Warehouse Selector */}
             <div>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                Selecionar
-              </div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                Selecionar Galpão
+              </label>
               <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -115,11 +168,14 @@ export function WarehouseSettingsPage() {
               </Select>
             </div>
 
-            <div className="row">
-              <div style={{ flex: '1 1 220px' }}>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                  Unidade
-                </div>
+            <div className="divider" />
+
+            {/* Metric Settings */}
+            <div className="grid grid-2" style={{ gap: 'var(--space-md)' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                  Unidade de Medida
+                </label>
                 <Select
                   value={metricUnit}
                   onChange={(e) => {
@@ -127,34 +183,72 @@ export function WarehouseSettingsPage() {
                     if (metricUnits.includes(v as MetricUnit)) setMetricUnit(v as Warehouse['metric_unit'])
                   }}
                 >
-                  <option value="m2">m²</option>
-                  <option value="pallet">Pallet</option>
-                  <option value="box">Caixa</option>
-                  <option value="position">Posição</option>
-                  <option value="custom">Custom</option>
+                  {metricUnits.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {metricLabelsMap[unit]}
+                    </option>
+                  ))}
                 </Select>
               </div>
 
-              <div style={{ flex: '1 1 220px' }}>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                  Label (opcional)
-                </div>
-                <Input value={metricLabel} onChange={(e) => setMetricLabel(e.target.value)} placeholder="ex: m²" />
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                  Label Personalizado
+                </label>
+                <Input
+                  value={metricLabel}
+                  onChange={(e) => setMetricLabel(e.target.value)}
+                  placeholder="Ex: m², pallets, caixas..."
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                  Capacidade Total
+                </label>
+                <Input
+                  value={capacityTotal}
+                  onChange={(e) => setCapacityTotal(e.target.value)}
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="0"
+                />
               </div>
             </div>
 
-            <div className="row">
-              <div style={{ flex: '1 1 220px' }}>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                  Capacidade total
+            {/* Current Preview */}
+            {selected && (
+              <div
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-md)',
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--space-xs)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Preview
                 </div>
-                <Input value={capacityTotal} onChange={(e) => setCapacityTotal(e.target.value)} inputMode="decimal" />
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-sm)' }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {capacityTotal || '0'}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {metricLabel || metricLabelsMap[metricUnit] || metricUnit}
+                  </span>
+                </div>
               </div>
-              <div style={{ flex: '1 1 220px', display: 'flex', alignItems: 'flex-end' }}>
-                <Button disabled={saving || !selected} onClick={onSave}>
-                  {saving ? 'Salvando...' : 'Salvar'}
-                </Button>
-              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)' }}>
+              <Button
+                onClick={onSave}
+                loading={saving}
+                disabled={!selected}
+              >
+                Salvar Configurações
+              </Button>
             </div>
           </div>
         )}
@@ -162,5 +256,3 @@ export function WarehouseSettingsPage() {
     </div>
   )
 }
-
-
