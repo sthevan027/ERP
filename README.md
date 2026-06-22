@@ -1,5 +1,9 @@
 # ERP Galpão (React + Supabase)
 
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black) ![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase&logoColor=white)
+
 ERP web para gerenciamento de armazenamento em galpões (logística), com **3 perfis**:
 
 - **Gestor**: acesso total (configuração, visão geral, relatórios no futuro)
